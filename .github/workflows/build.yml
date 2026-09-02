@@ -1,0 +1,90 @@
+name: Build libbox.aar
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      sing_box_version:
+        description: 'sing-box version (e.g. 1.14.0)'
+        required: false
+        default: ''
+
+env:
+  DEFAULT_VERSION: '1.14.0'
+
+jobs:
+  build:
+    name: Build libbox.aar (Android)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine version
+        id: ver
+        run: |
+          V="${{ github.event.inputs.sing_box_version }}"
+          if [ -z "$V" ]; then
+            TAG="${GITHUB_REF_NAME#v}"
+            V="${TAG:-$DEFAULT_VERSION}"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Building sing-box v$V"
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Setup Android NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install gomobile
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+          gomobile init
+
+      - name: Clone sing-box
+        run: |
+          V=${{ steps.ver.outputs.version }}
+          git clone https://github.com/SagerNet/sing-box.git -b "v$V" --depth 1
+          cd sing-box
+          echo "sing-box $(git describe --tags --always)"
+
+      - name: Build libbox.aar
+        run: |
+          cd sing-box
+          gomobile bind -v \
+            -androidapi 21 \
+            -javapkg=io.nekohasekai \
+            -libname=box \
+            -tags="with_quic,with_utls,with_clash_api,with_gvisor" \
+            ./experimental/libbox
+          ls -lh libbox.aar libbox-sources.jar 2>/dev/null || true
+          ls -lh *.aar
+
+      - name: Rename artifact
+        run: |
+          V=${{ steps.ver.outputs.version }}
+          cp sing-box/libbox.aar "libbox-$V.aar"
+          ls -lh "libbox-$V.aar"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libbox-aar
+          path: "libbox-*.aar"
+
+      - name: Publish to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "libbox-*.aar"
+          body: "libbox.aar built from sing-box v${{ steps.ver.outputs.version }}"
+          fail_on_unmatched_files: true
