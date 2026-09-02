@@ -52,12 +52,25 @@ jobs:
           git clone https://github.com/SagerNet/sing-box.git -b "v$V" --depth 1
 
       - name: Build
+        # 参数与 sing-box 官方 cmd/internal/build_libbox 对齐：
+        # Go 1.23+ 默认禁止 //go:linkname 引用标准库内部符号
+        # （sing-box/gvisor 引用 os.checkPidfdOnce），链接会报
+        # "invalid reference to os.checkPidfdOnce"。
+        # 必须带官方 LinkerFlags：-checklinkname=0 -s -w -buildid=
+        # 以及版本/运行时 godebug 注入；并加 -trimpath -buildvcs=false。
         run: |
           cd sing-box
-          gomobile bind -v -androidapi 21 -javapkg=io.nekohasekai -libname=box \
+          gomobile bind -v \
+            -o libbox.aar \
+            -androidapi 21 \
+            -javapkg=io.nekohasekai \
+            -libname=box \
+            -trimpath \
+            -buildvcs=false \
+            -ldflags="-X github.com/sagernet/sing-box/constant.Version=${{ steps.ver.outputs.version }} -X runtime.godebugDefault=multipathtcp=0,tlssha1=1 -checklinkname=0 -s -w -buildid=" \
             -tags="with_quic,with_utls,with_clash_api,with_gvisor" \
             ./experimental/libbox
-          ls -lh *.aar
+          ls -lh libbox.aar
 
       - name: Package
         run: |
