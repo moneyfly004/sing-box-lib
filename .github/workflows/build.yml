@@ -66,30 +66,30 @@ jobs:
         run: |
           cd sing-box
           gomobile bind -v \
-            -o libbox.aar \
+            -o libmoneyfly.aar \
             -androidapi 21 \
-            -javapkg=io.nekohasekai \
-            -libname=box \
+            -javapkg=top.moneyfly \
+            -libname=moneyfly \
             -trimpath \
             -buildvcs=false \
             -ldflags="-X github.com/sagernet/sing-box/constant.Version=${{ steps.ver.outputs.version }} -X runtime.godebugDefault=multipathtcp=0,tlssha1=1 -checklinkname=0 -s -w -buildid=" \
             -tags="with_quic,with_utls,with_clash_api,with_gvisor" \
             ./experimental/libbox
-          ls -lh libbox.aar
+          ls -lh libmoneyfly.aar
 
       - name: Package
         run: |
           V=${{ steps.ver.outputs.version }}
-          cp sing-box/libbox.aar "libbox-$V.aar"
+          cp sing-box/libmoneyfly.aar "libmoneyfly-$V.aar"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: libbox-aar
-          path: "libbox-*.aar"
+          name: libmoneyfly-aar
+          path: "libmoneyfly-*.aar"
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: "libbox-*.aar"
-          body: "libbox.aar from sing-box v${{ steps.ver.outputs.version }}"
+          files: "libmoneyfly-*.aar"
+          body: "libmoneyfly.aar built from sing-box v${{ steps.ver.outputs.version }}"
